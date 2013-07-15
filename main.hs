@@ -30,18 +30,19 @@ data Particle = Particle { particleHue :: GLfloat,
 							particleVelz :: GLfloat,
 							particleTTL :: Int} deriving (Eq, Show, Read)
 
-gravity = 0.0098 :: GLfloat
+gravity = 0.001 :: GLfloat
 
 main :: IO ()
 main = do
   (progname, _) <- getArgsAndInitialize
   createWindow "Particle Test"
   plist <- newIORef ([] :: ParticleList)
+  currcol <- newIORef (0.0 :: GLfloat) -- Sweeping hue change
   windowSize $= winSize
   displayCallback $= (display plist)
   reshapeCallback $= Just reshape
   keyboardMouseCallback $= Just keyboardMouse
-  idleCallback $= Just (idle plist)
+  idleCallback $= Just (idle plist currcol)
   spritetex <- loadTex
   mainLoop
 
@@ -98,13 +99,15 @@ display plist = do
   flush
   postRedisplay Nothing -- Force GLUT to refresh screen
 
-idle :: IORef ParticleList -> IO ()
-idle plist = do
+idle :: IORef ParticleList -> IORef GLfloat -> IO ()
+idle plist currcol = do
 			particles <- get plist
 			let updateparticles = map updateParticle particles
-			newparticles <- sequence (replicate 3 newParticle)
+			newparticles <- sequence (replicate 25 (newParticle currcol))
 			plist $= filter (\p -> particleTTL p >= 0)  (newparticles ++ updateparticles)
-
+			huebase <- get currcol
+			currcol $= colmod (huebase + 0.2)
+			putStrLn $ show $ huebase
 
 updateParticle :: Particle -> Particle
 updateParticle p =
@@ -113,25 +116,29 @@ updateParticle p =
 					particlePosy = particlePosy p + particleVely p,
 					particlePosz = particlePosz p + particleVelz p,
 					particleTTL = particleTTL p - 1,
-					particleSize = particleSize p * 0.9}
+					particleSat = particleSat p * 1.1,
+					particleVal = particleVal p - 0.01,
+					particleSize = particleSize p * 1.01}
 
 randomList :: Random a => (a, a) -> Int -> IO [a]
 randomList bounds n = do
 		sequence $ replicate n (randomRIO bounds)
 
-newParticle :: IO Particle
-newParticle = do
-			hue <- randomRIO (0,60)
-			psize <- randomRIO (0.01, 0.1) 
-			pvx <- randomRIO (-0.02, -0.08)
-			pvy <- randomRIO (0.1, 0.2)
-			pvz <- randomRIO (-0.2,-0.2)
-			ptime <- randomRIO (0, 5000)
+newParticle :: IORef GLfloat -> IO Particle
+newParticle huebaseRef = do
+			huebase <- get huebaseRef
+			hue <- randomRIO (huebase,huebase + 20)
+			sat <- randomRIO (0.0001, 0.1 :: GLfloat)
+			psize <- randomRIO (0.01, 0.05) 
+			pvx <- randomRIO (-0.02, -0.04)
+			pvy <- randomRIO (0.025, 0.05)
+			pvz <- return 0 
+			ptime <- randomRIO (5, 100)
 			return $ Particle { particlePosx = 1,
 							particlePosy = -1,
 							particlePosz = 1,
-							particleHue = hue,
-							particleSat = 1,
+							particleHue = colmod hue,
+							particleSat = sat,
 							particleVal = 1,
 							particleSize = psize,
 							particleVelx = pvx,
@@ -141,5 +148,9 @@ newParticle = do
 
 getGlColour :: GLfloat -> GLfloat -> GLfloat  -> Color3 GLfloat
 getGlColour h s v = Color3 (channelRed rgbcol) (channelGreen rgbcol) (channelBlue rgbcol)
-			where
+			where -- Pull out RGBs from hsv and opengl-ize them
 			rgbcol = hsv h s v
+
+colmod deg
+		| deg > 360 = colmod (deg - 360)
+		| otherwise = deg
