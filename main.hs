@@ -9,6 +9,11 @@ import System.Exit
 texname = "sprite.png"
 winSize = Size 800 800
 
+data Particle = Particle { particleColor :: Color3 GLfloat,
+							particleSize :: GLfloat,
+							particlePosx :: GLfloat,
+							particlePosy :: GLfloat }
+
 main :: IO ()
 main = do
   (progname, _) <- getArgsAndInitialize
@@ -34,21 +39,20 @@ extract act = do
 					Left err -> error err
 					Right val -> return val
 
-buildBox :: GLfloat -> IO ()
-buildBox w = do
-	color $ Color3 o z z
-	texCoord $ TexCoord2 z z
-	vertex $ Vertex2 n n
-	texCoord $ TexCoord2 z o
-	vertex $ Vertex2 n w
-	texCoord $ TexCoord2 o o
-	vertex $ Vertex2 w w
-	texCoord $ TexCoord2 o z
-	vertex $ Vertex2 w n
-	where
-	o = 1 :: GLfloat
-	z = 0 :: GLfloat
-	n = -w
+drawParticle :: Particle -> IO ()
+drawParticle p = do
+				color $ particleColor p
+				texCoord $ TexCoord2 z z
+				vertex $ Vertex2 (particlePosx p - particleSize p) (particlePosy p - particleSize p)
+				texCoord $ TexCoord2 z o
+				vertex $ Vertex2 (particlePosx p - particleSize p) (particlePosy p + particleSize p)
+				texCoord $ TexCoord2 o o
+				vertex $ Vertex2 (particlePosx p + particleSize p) (particlePosy p + particleSize p)
+				texCoord $ TexCoord2 o z
+				vertex $ Vertex2 (particlePosx p + particleSize p) (particlePosy p - particleSize p)
+				where
+				o = 1 :: GLfloat
+				z = 0 :: GLfloat
 
 loadTex = do
 		imgresult <- readTexture texname
@@ -68,5 +72,5 @@ display :: IO ()
 display = do
   clear [ ColorBuffer ]
   -- withTexture2D [spritetex] renderPrimitive Quads $ buildBox 0.2
-  renderPrimitive Quads $ buildBox 0.2
+  renderPrimitive Quads $ drawParticle (Particle { particleColor = Color3 1.0 1.0 1.0, particleSize = 0.2, particlePosx = 0, particlePosy = 0 }) 
   flush
